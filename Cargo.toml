@@ -1,0 +1,16 @@
+[package]
+name = "lhava_take_home"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+alloy = "0.11.1"
+alloy-primitives = "0.8.22"
+alloy-sol-types = "0.8.22"
+anyhow = "1.0.97"
+env_logger = "0.11.6"
+log = "0.4.26"
+structopt = "0.3.26"
+tokio = { version = "1.43.0", features = ["full"] }
+uniswap-sdk-core = "3.6.0"
+uniswap-v3-sdk = { version = "3.6.1", features = ["extensions"] }
