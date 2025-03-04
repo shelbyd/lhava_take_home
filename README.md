@@ -29,8 +29,8 @@ I prioritized the simplicity of implementing trading strategies. I expect there 
 ## Possible Improvements
 
 - Allow providing a private key and actually executing on chain
-  - Currently, the system forks the block with `anvil` and executes using a test account.
-- Receiving notifications for new blocks instead of polling
+  - Currently, the system forks the chain with `anvil` and executes using a test account.
+- Notifications for new blocks instead of polling
 - Executing strategies in response to new transactions (before they show up in a block)
 - More information in the TradeContext provided to a Strategy
   - Historical prices
