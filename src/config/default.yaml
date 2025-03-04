@@ -1,7 +1,7 @@
-chain_id: 1
+# Which RPC node to use.
 rpc_url: https://eth-mainnet.public.blastapi.io
 
-# The reference value for prices, usually make the most sense in USDC/USDT
+# The reference currency for prices, usually makes the most sense in USDC/USDT.
 base:
   erc20:
     symbol: USDC
@@ -13,12 +13,22 @@ base:
   #   address: "2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599"
   #   decimals: 8
 
+# The comparison currency. Prices will be in "base" units to 1 "quote" unit.
 quote:
   native:
 
+# The strategy to execute.
 strategy:
-  always_sell: 1
+  # Do nothing.
+  empty:
 
+  # Always buy the provided amount.
+  # always_buy: 1
+
+  # Always sell the provided amount.
+  # always_sell: 1
+
+  # Buy if beelow the below threshold, sell if above the sell threshold. Each of buy/sell are optional.
   # threshold:
   #   buy:
   #     at: 2060
@@ -31,6 +41,7 @@ strategy:
   #       numerator: 1
   #       denominator: 10
 
+  # Provide an exponential moving average of the price to the inner strategy.
   # ema:
   #   carry: 0.95
   #   inner:

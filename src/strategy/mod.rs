@@ -23,7 +23,7 @@ pub enum Trade {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Config {
-    Null {},
+    Empty(()),
     AlwaysBuy(AlwaysBuy),
     AlwaysSell(AlwaysSell),
     Threshold(Threshold),
@@ -33,7 +33,7 @@ pub enum Config {
 impl Config {
     pub fn into_dyn(self) -> Box<dyn Strategy> {
         match self {
-            Config::Null {} => Box::new(Null),
+            Config::Empty(()) => Box::new(Empty),
             Config::AlwaysBuy(v) => Box::new(v),
             Config::AlwaysSell(v) => Box::new(v),
             Config::Threshold(v) => Box::new(v),
@@ -93,9 +93,9 @@ impl Strategy for AlwaysSell {
     }
 }
 
-pub struct Null;
+pub struct Empty;
 
-impl Strategy for Null {
+impl Strategy for Empty {
     fn trade(&mut self, _: &TradeContext) -> Option<Trade> {
         None
     }

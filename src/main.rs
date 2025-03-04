@@ -23,7 +23,6 @@ struct Options {
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Config {
-    chain_id: u64,
     rpc_url: String,
 
     base: ConfigToken,
@@ -57,12 +56,11 @@ async fn main() -> anyhow::Result<()> {
         .build()?
         .try_deserialize()?;
 
-    let chain_id = config.chain_id;
     let rpc_url: Url = config.rpc_url.parse()?;
+    let provider = ProviderBuilder::new().on_http(rpc_url.clone());
+    let chain_id = provider.get_chain_id().await?;
 
     let mut strategy = config.strategy.into_dyn();
-
-    let provider = ProviderBuilder::new().on_http(rpc_url.clone());
 
     let base = to_token(&config.base, chain_id);
     let quote = to_token(&config.quote, chain_id);
