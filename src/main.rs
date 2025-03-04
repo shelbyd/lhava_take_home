@@ -7,10 +7,18 @@ use alloy::{
     transports::http::reqwest::Url,
 };
 use anyhow::Context;
+use structopt::StructOpt;
 use uniswap_sdk_core::{prelude::*, token};
 use uniswap_v3_sdk::prelude::*;
 
 mod strategy;
+
+#[derive(StructOpt)]
+struct Options {
+    // TODO(shelbyd): Should be PathBuf.
+    #[structopt(default_value = "src/config/default.yaml")]
+    config_file: String,
+}
 
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -42,8 +50,10 @@ async fn main() -> anyhow::Result<()> {
         .filter(None, log::LevelFilter::Info)
         .init();
 
+    let options = Options::from_args();
+
     let config: Config = ::config::Config::builder()
-        .add_source(config::File::with_name("./src/config.yaml"))
+        .add_source(config::File::with_name(&options.config_file))
         .build()?
         .try_deserialize()?;
 

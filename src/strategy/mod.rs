@@ -135,10 +135,13 @@ impl Strategy for Threshold {
     }
 }
 
+/// Composable wrapper strategy that provides an exponential moving average price to the inner strategy.
 pub struct ExponentialMovingAverage {
-    carry: f64,
     // TODO(shelbyd): Make possible to provide as type parameter.
     inner: Box<dyn Strategy>,
+
+    /// The fraction [0, 1] to multiply the previous price by. Usually ~0.9.
+    carry: f64,
 
     last: Option<f64>,
 }

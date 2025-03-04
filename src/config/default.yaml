@@ -1,12 +1,13 @@
 chain_id: 1
 rpc_url: https://eth-mainnet.public.blastapi.io
 
+# The reference value for prices, usually make the most sense in USDC/USDT
 base:
-  # native:
   erc20:
     symbol: USDC
     address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
     decimals: 6
+
   # erc20:
   #   symbol: WBTC
   #   address: "2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599"
@@ -14,10 +15,6 @@ base:
 
 quote:
   native:
-  # erc20:
-  #   symbol: USDC
-  #   address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
-  #   decimals: 6
 
 strategy:
   always_sell: 1
