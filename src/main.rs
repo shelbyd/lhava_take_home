@@ -7,11 +7,34 @@ use alloy::{
     transports::http::reqwest::Url,
 };
 use anyhow::Context;
-use strategy::Strategy;
 use uniswap_sdk_core::{prelude::*, token};
 use uniswap_v3_sdk::prelude::*;
 
 mod strategy;
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Config {
+    chain_id: u64,
+    rpc_url: String,
+
+    base: ConfigToken,
+    quote: ConfigToken,
+
+    strategy: strategy::Config,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum ConfigToken {
+    Native,
+
+    Erc20 {
+        symbol: String,
+        address: String,
+        decimals: u8,
+    },
+}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -19,26 +42,20 @@ async fn main() -> anyhow::Result<()> {
         .filter(None, log::LevelFilter::Info)
         .init();
 
-    let chain_id: u64 = env_or("CHAIN_ID", "1")?.parse()?;
-    let rpc_url: Url = env_or("RPC_URL", "https://eth-mainnet.public.blastapi.io")?.parse()?;
+    let config: Config = ::config::Config::builder()
+        .add_source(config::File::with_name("./src/config.yaml"))
+        .build()?
+        .try_deserialize()?;
 
-    let mut strategy = strategy::Null;
+    let chain_id = config.chain_id;
+    let rpc_url: Url = config.rpc_url.parse()?;
+
+    let mut strategy = config.strategy.into_dyn();
 
     let provider = ProviderBuilder::new().on_http(rpc_url.clone());
 
-    let base = token!(
-        chain_id,
-        "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
-        2,
-        "USDC"
-    );
-    let quote = Ether::on_chain(chain_id);
-    // let quote = token!(
-    //     chain_id,
-    //     "2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
-    //     8,
-    //     "WBTC"
-    // );
+    let base = to_token(&config.base, chain_id);
+    let quote = to_token(&config.quote, chain_id);
 
     let mut last_block = None;
     loop {
@@ -77,15 +94,31 @@ async fn main() -> anyhow::Result<()> {
                 let route = Route::new(vec![pool], base.clone(), quote.clone());
                 Trade::from_route(
                     route,
-                    CurrencyAmount::from_raw_amount(quote.clone(), amount)?,
+                    CurrencyAmount::from_fractional_amount(
+                        quote.clone(),
+                        amount.numerator,
+                        amount.denominator,
+                    )?,
                     TradeType::ExactOutput,
+                )?
+            }
+            strategy::Trade::Sell { amount } => {
+                let route = Route::new(vec![pool], base.clone(), quote.clone());
+                Trade::from_route(
+                    route,
+                    CurrencyAmount::from_fractional_amount(
+                        base.clone(),
+                        amount.numerator,
+                        amount.denominator,
+                    )?,
+                    TradeType::ExactInput,
                 )?
             }
         };
 
         let provider = ProviderBuilder::new().on_anvil_with_config(|anvil| {
             log::info!("Forking chain {chain_id} at {block}");
-            anvil.fork(rpc_url.clone()).fork_block_number(block)
+            anvil.fork(config.rpc_url.clone()).fork_block_number(block)
         });
         let account = provider.get_accounts().await?[0];
 
@@ -110,17 +143,14 @@ async fn main() -> anyhow::Result<()> {
     }
 }
 
-fn env_or(var: &str, default: &str) -> anyhow::Result<String> {
-    match std::env::var(var) {
-        Ok(v) => {
-            log::info!("Using provided value for {var}");
-            Ok(v)
-        }
-        Err(std::env::VarError::NotPresent) => {
-            log::info!("Env var {var} not provided, using default {default:?}");
-            Ok(default.to_string())
-        }
-        Err(e @ std::env::VarError::NotUnicode(_)) => return Err(e.into()),
+fn to_token(t: &ConfigToken, chain_id: u64) -> Currency {
+    match t {
+        ConfigToken::Native => Currency::NativeCurrency(Ether::on_chain(chain_id)),
+        ConfigToken::Erc20 {
+            symbol: name,
+            address,
+            decimals,
+        } => Currency::Token(token!(chain_id, address, *decimals, name)),
     }
 }
 
