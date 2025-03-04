@@ -3,7 +3,7 @@
 Included is a solution to the "DeFi Trading Challenge".
 
 - Implemented in Rust
-- Using the `[uniswap_v3_sdk](https://crates.io/crates/uniswap_v3_sdk)` crate
+- Using the [uniswap_v3_sdk](https://crates.io/crates/uniswap_v3_sdk) crate
 
 ## Running
 
