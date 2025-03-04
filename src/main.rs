@@ -7,7 +7,6 @@ use alloy::{
     transports::http::reqwest::Url,
 };
 use anyhow::Context;
-use num_traits::cast::ToPrimitive;
 use strategy::Strategy;
 use uniswap_sdk_core::{prelude::*, token};
 use uniswap_v3_sdk::prelude::*;
@@ -21,19 +20,25 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let chain_id: u64 = env_or("CHAIN_ID", "1")?.parse()?;
-    let rpc_url: Url = env_or("RPC_URL", "https://ethereum.publicnode.com")?.parse()?;
+    let rpc_url: Url = env_or("RPC_URL", "https://eth-mainnet.public.blastapi.io")?.parse()?;
 
-    let mut strategy = strategy::AlwaysBuy(1000);
+    let mut strategy = strategy::Null;
 
     let provider = ProviderBuilder::new().on_http(rpc_url.clone());
 
-    let base = Ether::on_chain(chain_id);
-    let quote = token!(
+    let base = token!(
         chain_id,
-        "2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
-        8,
-        "WBTC"
+        "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        2,
+        "USDC"
     );
+    let quote = Ether::on_chain(chain_id);
+    // let quote = token!(
+    //     chain_id,
+    //     "2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
+    //     8,
+    //     "WBTC"
+    // );
 
     let mut last_block = None;
     loop {
@@ -46,20 +51,23 @@ async fn main() -> anyhow::Result<()> {
         let pool = Pool::<EphemeralTickMapDataProvider>::from_pool_key_with_tick_data_provider(
             chain_id,
             FACTORY_ADDRESS,
-            quote.address(),
             base.address(),
+            quote.address(),
             FeeAmount::LOW,
             provider.clone(),
             Some(block_id),
         )
         .await?;
 
-        let price = pool.token0_price();
-        let price_lossy = price.numerator.to_f64().unwrap() / price.denominator.to_f64().unwrap();
-        let context = strategy::TradeContext { price_lossy };
+        let price = pool.token1_price();
 
+        let context = strategy::TradeContext {
+            price_lossy: price.to_significant(8, None)?.parse()?,
+        };
+
+        log::info!("Executing strategy with context {context:?}");
         let Some(trade) = strategy.trade(&context) else {
-            log::info!("No trade requested, continuing");
+            log::info!("Strategy produced no trade");
             continue;
         };
         log::info!("Strategy produced {trade:?}");
