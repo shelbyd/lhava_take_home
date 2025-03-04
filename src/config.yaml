@@ -20,7 +20,7 @@ quote:
   #   decimals: 6
 
 strategy:
-  # always_sell: 1
+  always_sell: 1
 
   # threshold:
   #   buy:
@@ -34,13 +34,13 @@ strategy:
   #       numerator: 1
   #       denominator: 10
 
-  ema:
-    carry: 0.95
-    inner:
-      threshold:
-        buy:
-          at: 2030
-          amount: 2
-        sell:
-          at: 2090
-          amount: 2
+  # ema:
+  #   carry: 0.95
+  #   inner:
+  #     threshold:
+  #       buy:
+  #         at: 2030
+  #         amount: 2
+  #       sell:
+  #         at: 2090
+  #         amount: 2

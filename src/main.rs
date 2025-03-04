@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{ops::ControlFlow, time::Duration};
 
 use alloy::{
     eips::BlockId,
@@ -89,10 +89,14 @@ async fn main() -> anyhow::Result<()> {
         };
         log::info!("Strategy produced {trade:?}");
 
+        // TODO(shelbyd): Allow providing private key and executing on actual chain.
         let provider = ProviderBuilder::new().on_anvil_with_config(|anvil| {
             log::info!("Forking chain {chain_id} at {block}");
             anvil.fork(config.rpc_url.clone()).fork_block_number(block)
         });
+        // TODO(shelbyd): Get anvil to produce blocks?
+        let after_trade = ControlFlow::Break("Chain forked for testing, so no blocks are produced");
+
         let account = provider.get_accounts().await?[0];
 
         let params = match trade {
@@ -145,8 +149,16 @@ async fn main() -> anyhow::Result<()> {
         log_balance("(base) after trade", account, &base, &provider).await?;
         log_balance("(quot) after trade", account, &quote, &provider).await?;
 
-        return Ok(());
+        match after_trade {
+            ControlFlow::Continue(()) => {}
+            ControlFlow::Break(msg) => {
+                log::info!("Terminating due to after trade 'break': {msg}");
+                break;
+            }
+        }
     }
+
+    Ok(())
 }
 
 async fn log_balance(
