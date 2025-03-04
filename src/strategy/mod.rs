@@ -25,7 +25,9 @@ pub enum Trade {
 pub enum Config {
     Null {},
     AlwaysBuy(AlwaysBuy),
+    AlwaysSell(AlwaysSell),
     Threshold(Threshold),
+    Ema { carry: f64, inner: Box<Config> },
 }
 
 impl Config {
@@ -33,7 +35,16 @@ impl Config {
         match self {
             Config::Null {} => Box::new(Null),
             Config::AlwaysBuy(v) => Box::new(v),
+            Config::AlwaysSell(v) => Box::new(v),
             Config::Threshold(v) => Box::new(v),
+            Config::Ema { carry, inner } => {
+                let inner = inner.into_dyn();
+                Box::new(ExponentialMovingAverage {
+                    carry,
+                    inner,
+                    last: None,
+                })
+            }
         }
     }
 }
@@ -65,6 +76,18 @@ pub struct AlwaysBuy(FractionInput);
 impl Strategy for AlwaysBuy {
     fn trade(&mut self, _: &TradeContext) -> Option<Trade> {
         Some(Trade::Buy {
+            amount: self.0.into(),
+        })
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(transparent)]
+pub struct AlwaysSell(FractionInput);
+
+impl Strategy for AlwaysSell {
+    fn trade(&mut self, _: &TradeContext) -> Option<Trade> {
+        Some(Trade::Sell {
             amount: self.0.into(),
         })
     }
@@ -109,5 +132,27 @@ impl Strategy for Threshold {
         }
 
         None
+    }
+}
+
+pub struct ExponentialMovingAverage {
+    carry: f64,
+    // TODO(shelbyd): Make possible to provide as type parameter.
+    inner: Box<dyn Strategy>,
+
+    last: Option<f64>,
+}
+
+impl Strategy for ExponentialMovingAverage {
+    fn trade(&mut self, ctx: &TradeContext) -> Option<Trade> {
+        let price = self
+            .last
+            .map(|p| p * self.carry + ctx.price_lossy * (1. - self.carry))
+            .unwrap_or(ctx.price_lossy);
+        self.last = Some(price);
+
+        log::info!("Giving inner strategy price as {price}");
+
+        self.inner.trade(&TradeContext { price_lossy: price })
     }
 }

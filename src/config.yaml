@@ -2,10 +2,11 @@ chain_id: 1
 rpc_url: https://eth-mainnet.public.blastapi.io
 
 base:
+  # native:
   erc20:
     symbol: USDC
     address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
-    decimals: 2
+    decimals: 6
   # erc20:
   #   symbol: WBTC
   #   address: "2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599"
@@ -13,16 +14,33 @@ base:
 
 quote:
   native:
+  # erc20:
+  #   symbol: USDC
+  #   address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+  #   decimals: 6
 
 strategy:
-  threshold:
-    buy:
-      at: 2060
-      amount:
-        numerator: 1
-        denominator: 10
-    sell:
-      at: 2070
-      amount:
-        numerator: 1
-        denominator: 10
+  # always_sell: 1
+
+  # threshold:
+  #   buy:
+  #     at: 2060
+  #     amount:
+  #       numerator: 1
+  #       denominator: 10
+  #   sell:
+  #     at: 2070
+  #     amount:
+  #       numerator: 1
+  #       denominator: 10
+
+  ema:
+    carry: 0.95
+    inner:
+      threshold:
+        buy:
+          at: 2030
+          amount: 2
+        sell:
+          at: 2090
+          amount: 2

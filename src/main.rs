@@ -89,46 +89,44 @@ async fn main() -> anyhow::Result<()> {
         };
         log::info!("Strategy produced {trade:?}");
 
-        let trade = match trade {
-            strategy::Trade::Buy { amount } => {
-                let route = Route::new(vec![pool], base.clone(), quote.clone());
-                Trade::from_route(
-                    route,
-                    CurrencyAmount::from_fractional_amount(
-                        quote.clone(),
-                        amount.numerator,
-                        amount.denominator,
-                    )?,
-                    TradeType::ExactOutput,
-                )?
-            }
-            strategy::Trade::Sell { amount } => {
-                let route = Route::new(vec![pool], base.clone(), quote.clone());
-                Trade::from_route(
-                    route,
-                    CurrencyAmount::from_fractional_amount(
-                        base.clone(),
-                        amount.numerator,
-                        amount.denominator,
-                    )?,
-                    TradeType::ExactInput,
-                )?
-            }
-        };
-
         let provider = ProviderBuilder::new().on_anvil_with_config(|anvil| {
             log::info!("Forking chain {chain_id} at {block}");
             anvil.fork(config.rpc_url.clone()).fork_block_number(block)
         });
         let account = provider.get_accounts().await?[0];
 
-        let params = swap_call_parameters(
-            &mut [trade],
-            SwapOptions {
-                recipient: account,
-                ..Default::default()
-            },
-        )?;
+        let params = match trade {
+            strategy::Trade::Buy { amount } => {
+                let route = Route::new(vec![pool], base.clone(), quote.clone());
+                let trade = Trade::from_route(
+                    route,
+                    from_human_amount(amount, &quote)?,
+                    TradeType::ExactOutput,
+                )?;
+                swap_call_parameters(
+                    &mut [trade],
+                    SwapOptions {
+                        recipient: account,
+                        ..Default::default()
+                    },
+                )?
+            }
+            strategy::Trade::Sell { amount } => {
+                let route = Route::new(vec![pool], quote.clone(), base.clone());
+                let trade = Trade::from_route(
+                    route,
+                    from_human_amount(amount, &quote)?,
+                    TradeType::ExactInput,
+                )?;
+                swap_call_parameters(
+                    &mut [trade],
+                    SwapOptions {
+                        recipient: account,
+                        ..Default::default()
+                    },
+                )?
+            }
+        };
 
         let tx = TransactionRequest::default()
             .from(account)
@@ -138,9 +136,47 @@ async fn main() -> anyhow::Result<()> {
             .input(params.calldata.into())
             .value(params.value);
 
+        log_balance("(base) before trade", account, &base, &provider).await?;
+        log_balance("(quot) before trade", account, &quote, &provider).await?;
+
         let hash = provider.send_transaction(tx).await?.watch().await?;
         log::info!("Successfully executed transaction {hash}");
+
+        log_balance("(base) after trade", account, &base, &provider).await?;
+        log_balance("(quot) after trade", account, &quote, &provider).await?;
+
+        return Ok(());
     }
+}
+
+async fn log_balance(
+    suffix: &str,
+    account: Address,
+    currency: &Currency,
+    provider: &impl alloy::providers::Provider,
+) -> anyhow::Result<()> {
+    alloy::sol! {
+        #[sol(rpc)]
+        interface ERC20 {
+            function balanceOf(address target) returns (uint256);
+        }
+    }
+
+    let balance = match currency {
+        Currency::NativeCurrency(_) => provider.get_balance(account).await?,
+        Currency::Token(t) => {
+            let erc20 = ERC20::new(t.address(), provider);
+            erc20.balanceOf(account).call().await?._0
+        }
+    };
+
+    log::info!(
+        "{account} has {} {} {suffix}",
+        CurrencyAmount::from_raw_amount(currency, balance.to_big_int())?.to_exact(),
+        currency.symbol().map_or("???", |v| v)
+    );
+
+    Ok(())
 }
 
 fn to_token(t: &ConfigToken, chain_id: u64) -> Currency {
@@ -166,4 +202,16 @@ async fn poll_next_block(
         }
         tokio::time::sleep(between_calls).await;
     }
+}
+
+fn from_human_amount(
+    amount: Fraction,
+    currency: &Currency,
+) -> anyhow::Result<CurrencyAmount<Currency>> {
+    let amount = CurrencyAmount::from_fractional_amount(
+        currency.clone(),
+        amount.numerator,
+        amount.denominator,
+    )?;
+    Ok(amount.multiply(&Fraction::new(amount.meta().decimal_scale.clone(), 1))?)
 }
